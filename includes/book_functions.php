@@ -17,7 +17,7 @@ function next_dropdowns_query($where_arr) //queries for the next dropdown based 
 	$select = 'SELECT 
 	Campuses.Campus_ID, Campuses.Location, 
 	Campus_Names.Campus_Name, Campuses.Program_Value, Campuses.Campus_Value,
-	Bookstores.Bookstore_ID, Bookstores.Storefront_URL, Bookstores.Fetch_URL, Bookstores.Store_Value, Bookstores.Follett_HEOA_Store_Value, Bookstores.Multiple_Campuses,
+	Bookstores.Bookstore_ID, Bookstores.Storefront_URL, Bookstores.Fetch_URL, Bookstores.Store_Value, Bookstores.Follett_HEOA_Store_Value, Bookstores.Neebo_School_ID, Bookstores.Multiple_Campuses,
 	Bookstore_Types.Bookstore_Type_Name, 
 	Terms_Cache.Term_ID, Terms_Cache.Term_Name, Terms_Cache.Term_Value, Terms_Cache.Follett_HEOA_Term_Value'; 
 	$from_and_where = 
@@ -129,7 +129,7 @@ function class_items_query($Class_IDs) //takes array of Class_IDs
 {
 	return 'SELECT 
 	Campuses.Campus_Value, Campuses.Program_Value,
-	Bookstores.Storefront_URL, Bookstores.Fetch_URL, Bookstores.Store_Value, Bookstores.Follett_HEOA_Store_Value, Bookstores.Multiple_Campuses,
+	Bookstores.Storefront_URL, Bookstores.Fetch_URL, Bookstores.Store_Value, Bookstores.Follett_HEOA_Store_Value, Bookstores.Neebo_School_ID, Bookstores.Multiple_Campuses,
 	Bookstore_Types.Bookstore_Type_Name, 
 	Terms_Cache.Term_ID, Terms_Cache.Term_Value, Terms_Cache.Follett_HEOA_Term_Value, Terms_Cache.Term_Name,
 	Divisions_Cache.Division_ID, Divisions_Cache.Division_Value, Divisions_Cache.Division_Name,
@@ -241,5 +241,3 @@ function update_items_db($Items)
 		}
 	}
 }
-
-?>

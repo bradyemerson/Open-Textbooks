@@ -10,5 +10,3 @@ define('PROXY_1_AUTH', '');
 
 define('PROXY_2', '');
 define('PROXY_2_AUTH', '');
-
-?>

@@ -2,19 +2,23 @@
 
 //error_reporting(0); //report all errors during development..
 
-$root = $_SERVER['DOCUMENT_ROOT'];
+$root = dirname(__FILE__);
 
 //config..
-require_once($root . '/../includes/db_config.php');
-require_once($root . '/../includes/proxy_config.php');
-
+require($root . '/db_config.php');
+define('CACHE_DIR', $root . '/../tmp/');
+//require($root . '/proxy_config.php');
 //includes..
-require_once($root . '/../includes/book_functions.php');
-require_once($root . '/../includes/bookstore_functions.php');
-require_once($root . '/../includes/db_functions.php');
-require_once($root . '/../includes/math_functions.php');
-require_once($root . '/../includes/parsing_functions.php');
-require_once($root . '/../includes/url_functions.php');
-require_once($root . '/../includes/validation_functions.php');
+require($root . '/book_functions.php');
+require($root . '/bookstore_functions.php');
+require($root . '/db_functions.php');
+require($root . '/math_functions.php');
+require($root . '/parsing_functions.php');
+require($root . '/url_functions.php');
+require($root . '/validation_functions.php');
 
-?>
+require($root . '/error_handler.php');
+$errorHandler = new ErrorHandle();
+if (strcmp($_SERVER['SERVER_NAME'], 'localhost') !== 0 && strpos($_SERVER['SERVER_NAME'], 'dev') !== 0) {
+    $errorHandler->enableEmail();
+}
