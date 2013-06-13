@@ -22,8 +22,8 @@ if (!$conn = connect()) {
     $json['status'] = 'Error: Invalid campus id';
 } else {
     $query = 'SELECT Storefront_URL FROM Bookstores
-INNER JOIN Campuses ON Campuses.Bookstore_ID = Bookstores.Bookstore_ID
-WHERE Campuses.Campus_ID = ' . mysql_real_escape_string($_GET['campus']);
+        INNER JOIN Campuses ON Campuses.Bookstore_ID = Bookstores.Bookstore_ID
+        WHERE Campuses.Campus_ID = ' . mysql_real_escape_string($_GET['campus']);
     if (!$result = mysql_query($query)) {
         $json['status'] = 'Error: Campus SQL query based on campus=' . $_GET['campus'] .
                 ' yielded error: ' . mysql_error();
@@ -35,21 +35,24 @@ WHERE Campuses.Campus_ID = ' . mysql_real_escape_string($_GET['campus']);
     }
 
     $query = 'SELECT
-Items.Title, Items.Edition, Items.Authors, Items.Year, Items.Publisher,
-Class_Items_Cache.New_Price, Class_Items_Cache.Used_Price,Class_Items_Cache.New_Rental_Price,Class_Items_Cache.Used_Rental_Price,
-Classes_Cache.Class_ID,
-Classes_Cache.Cache_TimeStamp BETWEEN NOW() - INTERVAL 1 WEEK AND NOW() as `CacheValid`
-FROM Class_Items_Cache
-INNER JOIN Items ON Items.Item_ID = Class_Items_Cache.Item_ID
-INNER JOIN Classes_Cache ON Classes_Cache.Class_ID = Class_Items_Cache.Class_ID
-INNER JOIN Courses_Cache ON Courses_Cache.Course_ID = Classes_Cache.Course_ID
-INNER JOIN Departments_Cache ON Departments_Cache.Department_ID = Courses_Cache.Department_ID
-INNER JOIN Divisions_Cache ON Divisions_Cache.Division_ID = Departments_Cache.Division_ID
-INNER JOIN Terms_Cache ON Terms_Cache.Term_ID = Divisions_Cache.Term_ID
-WHERE Items.ISBN = \'' . mysql_real_escape_string($_GET['isbn']) . '\' AND Terms_Cache.Campus_ID = ' .
-            mysql_real_escape_string($_GET['campus']) . '
-ORDER BY Class_Items_Cache.Cache_TimeStamp DESC
-LIMIT 1';
+        Items.Title, Items.Edition, Items.Authors, Items.Year, Items.Publisher,
+        Class_Items_Cache.New_Price,
+        Class_Items_Cache.Used_Price,
+        Class_Items_Cache.New_Rental_Price,
+        Class_Items_Cache.Used_Rental_Price,
+        Classes_Cache.Class_ID,
+        Classes_Cache.Cache_TimeStamp BETWEEN NOW() - INTERVAL 1 WEEK AND NOW() as `CacheValid`
+        FROM Class_Items_Cache
+        INNER JOIN Items ON Items.Item_ID = Class_Items_Cache.Item_ID
+        INNER JOIN Classes_Cache ON Classes_Cache.Class_ID = Class_Items_Cache.Class_ID
+        INNER JOIN Courses_Cache ON Courses_Cache.Course_ID = Classes_Cache.Course_ID
+        INNER JOIN Departments_Cache ON Departments_Cache.Department_ID = Courses_Cache.Department_ID
+        INNER JOIN Divisions_Cache ON Divisions_Cache.Division_ID = Departments_Cache.Division_ID
+        INNER JOIN Terms_Cache ON Terms_Cache.Term_ID = Divisions_Cache.Term_ID
+        WHERE Items.ISBN = \'' . mysql_real_escape_string($_GET['isbn']) .
+            '\' AND Terms_Cache.Campus_ID = ' . mysql_real_escape_string($_GET['campus']) . '
+        ORDER BY Class_Items_Cache.Cache_TimeStamp DESC
+        LIMIT 1';
 
     if (!isset($json['status']) && !$result = mysql_query($query)) {
         $json['status'] = 'Error: SQL query based on campus=' . $_GET['campus'] .
@@ -132,9 +135,6 @@ LIMIT 1';
         }
     }
 }
-
-
-//$json['storefront_url'] =
 
 $json['total_time'] = round(microtime(true) - $first_start, 3) * 1000;
 

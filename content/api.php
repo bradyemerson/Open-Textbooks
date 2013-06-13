@@ -25,17 +25,11 @@ if (!$conn = connect()) {
     $json['status'] = 'Error: DB Connect failure';
 } else if (!isset($_GET['campus'])) { /* campus list */
     $query = 'SELECT Campuses.Campus_ID, Campus_Names.Campus_Name
-	FROM
-	Campuses
-	INNER JOIN
-	Campus_Names
-	 ON Campuses.Campus_ID = Campus_Names.Campus_ID
-	INNER JOIN
-	Bookstores
-	 ON Bookstores.Bookstore_ID = Campuses.Bookstore_ID
+	FROM Campuses
+	INNER JOIN Campus_Names ON Campuses.Campus_ID = Campus_Names.Campus_ID
+	INNER JOIN Bookstores ON Bookstores.Bookstore_ID = Campuses.Bookstore_ID
 	WHERE Campus_Names.Is_Primary = "Y"
-	ORDER BY Campus_Names.Campus_Name ASC';
-
+        ORDER BY Campus_Names.Campus_Name ASC';
     if (!$result = mysql_query($query)) {
         $json['status'] = 'Error: SQL query for all campuses yielded error: ' . mysql_error();
     } else if (mysql_num_rows($result) == 0) {
@@ -149,7 +143,7 @@ if (!$conn = connect()) {
         } else {
             $row = mysql_fetch_assoc($result);
             if ($row['no_class_item']) { //note that this is Class_Items_Cache.Class_ID, NOT Classes_Cache.Class_ID which must have been set from before (or else you'd get the 0 rows error above)
-                mysql_close($conn);
+                //mysql_close($conn);
                 update_class_items_from_bookstore(array($row)); //this function updates the DB with the class-item data
                 if (!$conn = connect()) {
                     $json['status'] = mysql_error();

@@ -19,17 +19,14 @@ if (!$conn = connect()) {
     $json['status'] = 'Error: Invalid campus id';
 } else {
     $query = 'SELECT
-	Campuses.Campus_ID, Campuses.Location,
-	Campus_Names.Campus_Name, Campuses.Program_Value, Campuses.Campus_Value,
-	Bookstores.Bookstore_ID, Bookstores.Storefront_URL, Bookstores.Fetch_URL, Bookstores.Store_Value, Bookstores.Follett_HEOA_Store_Value, Bookstores.Multiple_Campuses,
-	Bookstore_Types.Bookstore_Type_Name
-    FROM
-	Campuses
-	INNER JOIN (Campus_Names)
-	 ON (Campuses.Campus_ID = Campus_Names.Campus_ID AND Campus_Names.Is_Primary = "Y")
-	INNER JOIN (Bookstores, Bookstore_Types)
-	 ON (Bookstores.Bookstore_ID = Campuses.Bookstore_ID AND Bookstores.Bookstore_Type_ID = Bookstore_Types.Bookstore_Type_ID)
-    WHERE Campuses.Enabled = "Y" AND Campuses.Campus_ID = ' . mysql_real_escape_string($_GET['campus']);
+        Campuses.Campus_ID, Campuses.Location,
+        Campus_Names.Campus_Name, Campuses.Program_Value, Campuses.Campus_Value,
+        Bookstores.Bookstore_ID, Bookstores.Storefront_URL, Bookstores.Fetch_URL, Bookstores.Store_Value, Bookstores.Follett_HEOA_Store_Value, Bookstores.Multiple_Campuses,
+        Bookstore_Types.Bookstore_Type_Name
+        FROM Campuses
+        INNER JOIN (Campus_Names) ON (Campuses.Campus_ID = Campus_Names.Campus_ID AND Campus_Names.Is_Primary = "Y")
+        INNER JOIN (Bookstores, Bookstore_Types) ON (Bookstores.Bookstore_ID = Campuses.Bookstore_ID AND Bookstores.Bookstore_Type_ID = Bookstore_Types.Bookstore_Type_ID)
+        WHERE Campuses.Enabled = "Y" AND Campuses.Campus_ID = ' . mysql_real_escape_string($_GET['campus']);
 
     if (!$result = mysql_query($query)) {
         $json['status'] = 'Error: SQL query based on campus=' . $_GET['campus'] . ' yielded error: ' . mysql_error();
@@ -43,8 +40,7 @@ if (!$conn = connect()) {
 
         $select = 'SELECT ISBN as isbn, Title as title, Edition as edition,
         Authors as authors, Year as year, Publisher as publisher
-        FROM Items WHERE ISBN = \'' .
-                mysql_real_escape_string($row['isbn']) . '\'';
+        FROM Items WHERE ISBN = \'' . mysql_real_escape_string($row['isbn']) . '\'';
         if (!$result = mysql_query($select)) {
             // not going to fail on this
         } else if (mysql_num_rows($result) != 0) {

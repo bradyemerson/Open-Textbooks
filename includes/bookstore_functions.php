@@ -285,34 +285,58 @@ function get_classes_and_items_from_follett($valuesArr) {
         $value_name = 'Term_Value';
     } else if (!isset($valuesArr['Division_ID'])) {
 
-        //The divisions request is always sent, even when there aren't any.  	//http://www.bkstr.com/webapp/wcs/stores/servlet/LocateCourseMaterialsServlet?requestType=DIVISIONS&storeId=10415&demoKey=d&programId=727&termId=100019766&_=
+        //The divisions request is always sent, even when there aren't any.
 
-        $url .= 'LocateCourseMaterialsServlet?requestType=DIVISIONS&storeId=' . urlencode($valuesArr['Store_Value']) . '&campusId=' . urlencode($valuesArr['Campus_Value']) . '&demoKey=d&programId=' . urlencode($valuesArr['Program_Value']) . '&termId=' . $valuesArr['Term_Value'];
+        $url .= 'LocateCourseMaterialsServlet?requestType=DIVISIONS&storeId=' . urlencode($valuesArr['Store_Value']) .
+                '&campusId=' . urlencode($valuesArr['Campus_Value']) .
+                '&demoKey=d&programId=' . urlencode($valuesArr['Program_Value']) .
+                '&termId=' . $valuesArr['Term_Value'];
 
         $response_name = 'DIVISIONS';
         $display_name = 'Division_Name';
         $value_name = 'Division_Value';
     } else if (!isset($valuesArr['Department_ID'])) {
-        $url .= 'LocateCourseMaterialsServlet?demoKey=d&divisionName=' . urlencode($valuesArr['Division_Value']) . '&campusId=' . urlencode($valuesArr['Campus_Value']) . '&programId=' . urlencode($valuesArr['Program_Value']) . '&requestType=DEPARTMENTS&storeId=' . urlencode($valuesArr['Store_Value']) . '&termId=' . urlencode($valuesArr['Term_Value']);
+        $url .= 'LocateCourseMaterialsServlet?demoKey=d&divisionName=' . urlencode($valuesArr['Division_Value']) .
+                '&campusId=' . urlencode($valuesArr['Campus_Value']) .
+                '&programId=' . urlencode($valuesArr['Program_Value']) .
+                '&requestType=DEPARTMENTS&storeId=' . urlencode($valuesArr['Store_Value']) .
+                '&termId=' . urlencode($valuesArr['Term_Value']);
 
         $response_name = 'DEPARTMENTS';
         $display_name = 'Department_Code';
         $value_name = 'Department_Value';
     } else if (!isset($valuesArr['Course_ID'])) {
-        $url .= 'LocateCourseMaterialsServlet?demoKey=d&divisionName=' . urlencode($valuesArr['Division_Value']) . '&campusId=' . urlencode($valuesArr['Campus_Value']) . '&programId=' . urlencode($valuesArr['Program_Value']) . '&requestType=COURSES&storeId=' . urlencode($valuesArr['Store_Value']) . '&termId=' . urlencode($valuesArr['Term_Value']) . '&departmentName=' . urlencode($valuesArr['Department_Code']) . '&_=';
+        $url .= 'LocateCourseMaterialsServlet?demoKey=d&divisionName=' . urlencode($valuesArr['Division_Value']) .
+                '&campusId=' . urlencode($valuesArr['Campus_Value']) .
+                '&programId=' . urlencode($valuesArr['Program_Value']) .
+                '&requestType=COURSES&storeId=' . urlencode($valuesArr['Store_Value']) .
+                '&termId=' . urlencode($valuesArr['Term_Value']) .
+                '&departmentName=' . urlencode($valuesArr['Department_Code']) .
+                '&_=';
 
         $response_name = 'COURSES';
         $display_name = 'Course_Code';
         $value_name = 'Course_Value';
     } else if (!isset($valuesArr['Class_ID'])) {
-        $url .= 'LocateCourseMaterialsServlet?demoKey=d&divisionName=' . urlencode($valuesArr['Division_Value']) . '&programId=' . urlencode($valuesArr['Program_Value']) . '&requestType=SECTIONS&storeId=' . urlencode($valuesArr['Store_Value']) . '&termId=' . urlencode($valuesArr['Term_Value']) . '&departmentName=' . urlencode($valuesArr['Department_Code']) . '&courseName=' . urlencode($valuesArr['Course_Code']) . '&_=';
+        $url .= 'LocateCourseMaterialsServlet?demoKey=d&divisionName=' . urlencode($valuesArr['Division_Value']) .
+                '&programId=' . urlencode($valuesArr['Program_Value']) .
+                '&requestType=SECTIONS&storeId=' . urlencode($valuesArr['Store_Value']) .
+                '&termId=' . urlencode($valuesArr['Term_Value']) .
+                '&departmentName=' . urlencode($valuesArr['Department_Code']) .
+                '&courseName=' . urlencode($valuesArr['Course_Code']) .
+                '&_=';
 
         $response_name = 'SECTIONS';
         $display_name = 'Class_Code';
         $value_name = 'Class_Value';
     } else {
         //class books query.. it's special.
-        $url .= 'booklookServlet?bookstore_id-1=' . urlencode($valuesArr['Follett_HEOA_Store_Value']) . '&term_id-1=' . urlencode($valuesArr['Follett_HEOA_Term_Value']) . '&div-1=' . urlencode($valuesArr['Division_Value']) . '&dept-1=' . urlencode($valuesArr['Department_Value']) . '&course-1=' . urlencode($valuesArr['Course_Value']) . '&section-1=' . urlencode($valuesArr['Class_Value']);
+        $url .= 'booklookServlet?bookstore_id-1=' . urlencode($valuesArr['Follett_HEOA_Store_Value']) .
+                '&term_id-1=' . urlencode($valuesArr['Follett_HEOA_Term_Value']) .
+                '&div-1=' . urlencode($valuesArr['Division_Value']) .
+                '&dept-1=' . urlencode($valuesArr['Department_Value']) .
+                '&course-1=' . urlencode($valuesArr['Course_Value']) .
+                '&section-1=' . urlencode($valuesArr['Class_Value']);
     }
 
     //make the request and reutrn the response
@@ -362,7 +386,9 @@ function get_classes_and_items_from_follett($valuesArr) {
                 if ($error_tag->length != 0) {
                     $error = $error_tag->item(0)->textContent;
 
-                    if (!stripos($error, 'to be determined') && !stripos($error, 'no course materials required') && !stripos($error, 'no information received')) { //these are the two exceptions where there genuinely are 0 results.
+                    if (!stripos($error, 'to be determined') &&
+                            !stripos($error, 'no course materials required') &&
+                            !stripos($error, 'no information received')) { //these are the two exceptions where there genuinely are 0 results.
                         throw new Exception('Error: ' . $error . ' on Follett booklook with values ' . print_r($valuesArr, true)); //we report the specific error that Follett's booklook gives us.
                     }
                 } else {
@@ -453,25 +479,39 @@ function get_classes_and_items_from_epos($valuesArr) {
         $display_name = 'Term_Name';
         $value_name = 'Term_Value';
     } else if (!isset($valuesArr['Department_ID'])) {
-        $url .= 'wpd=1&step=2&listtype=begin&form=shared3%2Ftextbooks%2Fno_jscript%2Fmain.html&agent=' . $user_agent . '&TERM=' . urlencode($valuesArr['Term_Value']) . '&Go=Go';
+        $url .= 'wpd=1&step=2&listtype=begin&form=shared3%2Ftextbooks%2Fno_jscript%2Fmain.html&agent=' . $user_agent .
+                '&TERM=' . urlencode($valuesArr['Term_Value']) .
+                '&Go=Go';
 
         $response_name = 'department';
         $display_name = 'Department_Code';
         $value_name = 'Department_Value';
     } else if (!isset($valuesArr['Course_ID'])) {
-        $url .= 'wpd=1&step=3&listtype=begin&form=shared3%2Ftextbooks%2Fno_jscript%2Fmain.html&agent=' . $user_agent . '&TERM=' . urlencode($valuesArr['Term_Value']) . '&department=' . urlencode($valuesArr['Department_Value']) . '&Go=Go';
+        $url .= 'wpd=1&step=3&listtype=begin&form=shared3%2Ftextbooks%2Fno_jscript%2Fmain.html&agent=' . $user_agent .
+                '&TERM=' . urlencode($valuesArr['Term_Value']) .
+                '&department=' . urlencode($valuesArr['Department_Value']) .
+                '&Go=Go';
 
         $response_name = 'course';
         $display_name = 'Course_Code';
         $value_name = 'Course_Value';
     } else if (!isset($valuesArr['Class_ID'])) {
-        $url .= 'wpd=1&step=4&listtype=begin&form=shared3%2Ftextbooks%2Fno_jscript%2Fmain.html&agent=' . $user_agent . '&TERM=' . urlencode($valuesArr['Term_Value']) . '&department=' . urlencode($valuesArr['Department_Value']) . '&course=' . urlencode($valuesArr['Course_Value']) . '&Go=Go';
+        $url .= 'wpd=1&step=4&listtype=begin&form=shared3%2Ftextbooks%2Fno_jscript%2Fmain.html&agent=' . $user_agent .
+                '&TERM=' . urlencode($valuesArr['Term_Value']) .
+                '&department=' . urlencode($valuesArr['Department_Value']) .
+                '&course=' . urlencode($valuesArr['Course_Value']) .
+                '&Go=Go';
 
         $response_name = 'section';
         $display_name = 'Class_Code';
         $value_name = 'Class_Value';
     } else { //they sent a class
-        $url .='wpd=1&step=5&listtype=begin&form=shared3%2Ftextbooks%2Fno_jscript%2Fmain.html&agent=' . $user_agent . '&TERM=' . urlencode($valuesArr['Term_Value']) . '&department=' . urlencode($valuesArr['Department_Value']) . '&course=' . urlencode($valuesArr['Course_Value']) . '&section=' . urlencode($valuesArr['Class_Value']) . '&Go=Go';
+        $url .='wpd=1&step=5&listtype=begin&form=shared3%2Ftextbooks%2Fno_jscript%2Fmain.html&agent=' . $user_agent .
+                '&TERM=' . urlencode($valuesArr['Term_Value']) .
+                '&department=' . urlencode($valuesArr['Department_Value']) .
+                '&course=' . urlencode($valuesArr['Course_Value']) .
+                '&section=' . urlencode($valuesArr['Class_Value']) .
+                '&Go=Go';
     }
 
     $response = curl_request(array(CURLOPT_URL => $url));
