@@ -35,4 +35,3 @@ Contact me at bsgreenb@gmail.com with any questions.  I'm happy to help with wha
 ## Additional Resources
 
 * Getchabooks has open-sourced their code base, which includes a complete textbook comparison site with scraping of Barnes and Nobles and Follett stores.  https://github.com/getchabooks/getchabooks
-* [Hubify](http://hubify.com) is a service that has automated the textbook scrapers, and will do all the work for your site.  They handle all the scaling, proxy concerns, rate limiting, etc.
