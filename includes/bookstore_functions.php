@@ -234,14 +234,14 @@ function get_classes_and_items_from_neebo($valuesArr) {
     return $returnArray;
 }
 
-function get_classes_and_items_from_follett($valuesArr) {
+function get_classes_and_items_from_follett(array $valuesArr) {
     //We hardcode Program_Value and Campus_Value in the Campuses table because they are campus-specific and pretty much static.  Division_Value varies and is sometimes like a higher level department, so we give it it's own table..
 
     $returnArray = array();
     $url = $valuesArr['Fetch_URL'] . 'webapp/wcs/stores/servlet/';
     $referer = $valuesArr['Storefront_URL'];
 
-    if ($valuesArr['Bookstore_Type_Name'] == 'Follett' && $valuesArr['Follett_HEOA_Store_Value'] == '1076') {
+    if ($valuesArr['Follett_HEOA_Store_Value'] == '1076') {
         if (isset($valuesArr['Division_ID'])) {
             // Ivy Tech does this backwards so we'll fix it
             $valuesArr['Division_Value'] = $valuesArr['Campus_Value'];
@@ -266,11 +266,14 @@ function get_classes_and_items_from_follett($valuesArr) {
     if (!isset($valuesArr['Class_ID'])) { //note that we only need to do this for the dropdowns, not for booklook, which is on a seperate HEOA page which doesn't require a session.
         $options = array(
             CURLOPT_URL => $valuesArr['Storefront_URL'],
-            CURLOPT_USERAGENT => random_user_agent() // set a random agent now and then use it throughout
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 6.1; rv:21.0) Gecko/20100101 Firefox/21.0',
+            CURLOPT_HTTPHEADER => array(
+                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language: en-US,en;q=0.5',
+            ),
         );
 
         $response = curl_request($options); //query the main page to pick up the cookies
-
         if (!$response) {
             throw new Exception('Unable to fetch Follett Storefront for session with values ' . print_r($valuesArr, true));
         }
@@ -284,9 +287,7 @@ function get_classes_and_items_from_follett($valuesArr) {
         $display_name = 'Term_Name';
         $value_name = 'Term_Value';
     } else if (!isset($valuesArr['Division_ID'])) {
-
         //The divisions request is always sent, even when there aren't any.
-
         $url .= 'LocateCourseMaterialsServlet?requestType=DIVISIONS&storeId=' . urlencode($valuesArr['Store_Value']) .
                 '&campusId=' . urlencode($valuesArr['Campus_Value']) .
                 '&demoKey=d&programId=' . urlencode($valuesArr['Program_Value']) .
@@ -318,13 +319,15 @@ function get_classes_and_items_from_follett($valuesArr) {
         $display_name = 'Course_Code';
         $value_name = 'Course_Value';
     } else if (!isset($valuesArr['Class_ID'])) {
-        $url .= 'LocateCourseMaterialsServlet?demoKey=d&divisionName=' . urlencode($valuesArr['Division_Value']) .
-                '&programId=' . urlencode($valuesArr['Program_Value']) .
-                '&requestType=SECTIONS&storeId=' . urlencode($valuesArr['Store_Value']) .
-                '&termId=' . urlencode($valuesArr['Term_Value']) .
-                '&departmentName=' . urlencode($valuesArr['Department_Code']) .
-                '&courseName=' . urlencode($valuesArr['Course_Code']) .
-                '&_=';
+        $url .= 'LocateCourseMaterialsServlet?requestType=SECTIONS' .
+                '&storeId=' . rawurlencode($valuesArr['Store_Value']) .
+                '&demoKey=d' .
+                ($valuesArr['Campus_Value'] ? '&campusId=' . rawurlencode($valuesArr['Campus_Value']) : '') .
+                '&programId=' . rawurlencode($valuesArr['Program_Value']) .
+                '&termId=' . rawurlencode($valuesArr['Term_Value']) .
+                '&divisionName=' . rawurlencode($valuesArr['Division_Value']) .
+                '&departmentName=' . rawurlencode($valuesArr['Department_Code']) .
+                '&courseName=' . rawurlencode($valuesArr['Course_Code']);
 
         $response_name = 'SECTIONS';
         $display_name = 'Class_Code';
@@ -339,12 +342,26 @@ function get_classes_and_items_from_follett($valuesArr) {
                 '&section-1=' . urlencode($valuesArr['Class_Value']);
     }
 
-    //make the request and reutrn the response
-    $response = curl_request(array(
-        CURLOPT_URL => $url,
-        CURLOPT_REFERER => $referer,
-        CURLOPT_USERAGENT => $options[CURLOPT_USERAGENT]
-    ));
+    if (!isset($valuesArr['Class_ID'])) {
+        // dropdown request
+        $response = curl_request(array(
+            CURLOPT_URL => $url,
+            CURLOPT_REFERER => $referer,
+            CURLOPT_USERAGENT => $options[CURLOPT_USERAGENT],
+            CURLOPT_HTTPHEADER => array(
+                'Accept: text/javascript, text/html, application/xml, text/xml, */*',
+                'Accept-Language: en-US,en;q=0.5',
+                'X-Requested-With: XMLHttpRequest',
+                'X-Prototype-Version: 1.5.0'
+            )
+        ));
+    } else {
+        // class books query
+        $response = curl_request(array(
+            CURLOPT_URL => $url,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 6.1; rv:21.0) Gecko/20100101 Firefox/21.0'
+        ));
+    }
 
     if ($response) {
         $doc = new DOMDocument();
@@ -359,9 +376,7 @@ function get_classes_and_items_from_follett($valuesArr) {
 
                 preg_match("/'[^']+'/", $script, $matches);
 
-                $json = substr($matches[0], 1, -1);
-
-                $json = json_decode($json, true);
+                $json = json_decode(substr($matches[0], 1, -1), true);
 
                 if (isset($json['meta'][0]['request']) && $json['meta'][0]['request'] == $response_name) {
                     foreach ($json['data'][0] as $key => $value) {
@@ -375,78 +390,100 @@ function get_classes_and_items_from_follett($valuesArr) {
             }
         } else {
             //class-book response from Follett's booklook system
-            $finder = new DomXPath($doc);
             $items = array();
 
-            $results = $finder->query('//div[@class="paddingLeft1em results"]');
-            if ($results->length > 0) {
-                $resultNode = $results->item(0); //TODO: default to first campus, can we do something smarter?
+            $html = str_get_html($response);
 
-                $error_tag = $finder->query('.//*[@class="error"]', $resultNode); //sometimes errors are in an <h2>, sometimes in a <p>, it depends on the error.
-                if ($error_tag->length != 0) {
-                    $error = $error_tag->item(0)->textContent;
+            $course = $html->find('div[class=clsCourseSection]', 0);
+            if (!$course) {
+                throw new Exception('Error: HTML markup was unexpected, unable to parse.');
+            }
 
-                    if (!stripos($error, 'to be determined') &&
-                            !stripos($error, 'no course materials required') &&
-                            !stripos($error, 'no information received')) { //these are the two exceptions where there genuinely are 0 results.
-                        throw new Exception('Error: ' . $error . ' on Follett booklook with values ' . print_r($valuesArr, true)); //we report the specific error that Follett's booklook gives us.
-                    }
+            $error = $course->find('.efCourseErrorSection', 0);
+            if ($error) {
+                $error_text = $error->plaintext;
+                if (!stripos($error_text, 'to be determined') &&
+                        !stripos($error_text, 'no course materials required') &&
+                        !stripos($error_text, 'no information received')) { //these are the two exceptions where there genuinely are 0 results.
+                    throw new Exception('Error: ' . $error_text . ' on Follett booklook with values ' . print_r($valuesArr, true)); //we report the specific error that Follett's booklook gives us.
                 } else {
-                    $i = 0; //counter for $items
+                    $returnArray['Class_ID'] = $valuesArr['Class_ID'];
+                    $returnArray['items'] = $items;
 
-                    foreach ($resultNode->childNodes as $childNode) {
-                        if ($childNode->nodeName == 'h2') {
-                            $necessity = $childNode->textContent;
-                        } else if ($childNode->nodeName == 'h3' && $childNode->getAttribute('class') == 'paddingChoice') {
-                            $necessity = $childNode->textContent;
-                        } else if ($childNode->nodeName == 'div' && $childNode->getAttribute('class') == 'paddingLeft5em') {
-                            $resultLIs = $finder->query('.//ul/li', $childNode);
-                            foreach ($resultLIs as $resultLI) {
-                                $span = $resultLI->getElementsByTagName('span');
-                                if ($span->length) {
-                                    $resultLI->removeChild($span->item(0));
-                                }
-                                $result = explode(':', $resultLI->nodeValue, 2);
-                                $items[$i]['Necessity'] = $necessity;
-                                switch (strtolower(trim($result[0]))) {
-                                    case 'title':
-                                        $items[$i]['Title'] = $result[1];
-                                        break;
-                                    case 'author':
-                                        $items[$i]['Authors'] = $result[1];
-                                        break;
-                                    case 'edition':
-                                        $items[$i]['Edition'] = $result[1];
-                                        break;
-                                    case 'copyright year':
-                                        $items[$i]['Year'] = $result[1];
-                                        break;
-                                    case 'publisher':
-                                        $items[$i]['Publisher'] = $result[1];
-                                        break;
-                                    case 'isbn':
-                                        $items[$i]['ISBN'] = $result[1];
-                                        break;
-                                    case 'new':
-                                        $items[$i]['Bookstore_Price'] = $result[1];
-                                        $items[$i]['New_Price'] = $items[$i]['Bookstore_Price'];
-                                        break;
-                                    case 'used':
-                                        $items[$i]['Used_Price'] = $result[1];
-                                        if (!isset($items[$i]['Bookstore_Price'])) {
-                                            $items[$i]['Bookstore_Price'] = $items[$i]['Used_Price'];
-                                        }
-                                        break;
+                    return $returnArray;
+                }
+            }
+
+            foreach ($course->find('div[class=efCourseBody] ul li[class=material-group]') as $li) {
+                // Each li represents required/optional/other
+
+                $group_title = $li->find('h2[class=material-group-name]', 0);
+                $required = $group_title->plaintext;
+                if (strpos($required, '(')) {
+                    $required = substr($required, 0, strpos($required, '('));
+                }
+
+                foreach ($li->find('li') as $book) {
+                    $item = array(
+                        'Necessity' => $required
+                    );
+
+                    foreach ($book->find('div[class=material-group-cover] span[id^=material]') as $info) {
+                        switch ($info->getAttribute('id')) {
+                            case 'materialTitleImage':
+                                $image = $info->find('img', 0);
+                                $item['Title'] = $image->alt;
+                                break;
+                            case 'materialAuthor':
+                                $item['Authors'] = trim(substr($info->plaintext, strpos($info->plaintext, ':') + 1));
+                                break;
+                            case 'materialEdition':
+                                $item['Edition'] = trim(substr($info->plaintext, strpos($info->plaintext, ':') + 1));
+                                break;
+                            case 'materialISBN':
+                                $item['ISBN'] = trim(substr($info->plaintext, strpos($info->plaintext, ':') + 1));
+                                break;
+                            case 'materialCopyrightYear':
+                                $item['Year'] = trim(substr($info->plaintext, strpos($info->plaintext, ':') + 1));
+                                break;
+                            case 'materialPublisher':
+                                $item['Publisher'] = trim(substr($info->plaintext, strpos($info->plaintext, ':') + 1));
+                                break;
+                        }
+                    }
+
+                    foreach ($book->find('div[class=material-group-table] table tr[class=print_background]') as $tr) {
+                        $buy_rent = $tr->find('td', 1);
+                        $new_used = $tr->find('td', 2);
+                        $price = $tr->find('td', 7);
+                        if (strcmp($buy_rent->plaintext, 'BUY&nbsp;')) {
+                            if (strcmp($new_used->plaintext, 'NEW&nbsp;')) {
+                                $item['Bookstore_Price'] = $price->plaintext;
+                                $item['New_Price'] = $item['Bookstore_Price'];
+                            } else if (strcmp($new_used->plaintext, 'USED&nbsp;')) {
+                                $item['Used_Price'] = $price->plaintext;
+                                if (!isset($item['Bookstore_Price'])) {
+                                    $item['Bookstore_Price'] = $item['Used_Price'];
                                 }
                             }
-                            $i++;
+                        } elseif (strcmp($buy_rent->plaintext, 'RENT&nbsp;')) {
+
                         }
+                    }
+
+                    if (isset($item['ISBN'])) {
+                        $items[] = $item;
                     }
                 }
             }
 
+            $html->clear();
+            unset($html);
+
             $returnArray['Class_ID'] = $valuesArr['Class_ID'];
             $returnArray['items'] = $items; //trim them all
+            //print_r($items);
+            //exit();
         }
 
         return $returnArray;
@@ -1650,7 +1687,7 @@ function update_class_items_from_bookstore($classValuesArr) { //$classValuesArr 
                     case 'eRATEX':
                         $results = get_classes_and_items_from_eratex($valuesArr);
                         break;
-//These functions will return false or empty array on error or 0 $results...
+                    //These functions will return false or empty array on error or 0 $results...
                 }
             } catch (Exception $e) {
                 $results = false;
@@ -1661,8 +1698,8 @@ function update_class_items_from_bookstore($classValuesArr) { //$classValuesArr 
                 $Items = array();
 
                 foreach ($results['items'] as $i => $item) {
-//Set data source and format the item.. Also add it to $Items for later update.
-//**make it so it ignores the ones with the bad titles..
+                    //Set data source and format the item.. Also add it to $Items for later update.
+                    //**make it so it ignores the ones with the bad titles..
                     $exclude = array('As Of Today,No Book Order Has Been Submitted,Pleas,'); #Note that this is their typo, not mine
                     $item = format_item($item);
 

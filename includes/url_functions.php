@@ -45,7 +45,6 @@ function curl_request($options) { //single custom cURL request.
         if ($curl_error = curl_error($ch)) {
             $error .= ' with curl error: ' . $curl_error;
         }
-        //echo $error;
         trigger_error($error);
     }
 

@@ -10,7 +10,7 @@
 //
 //..where N is an ID.  Note that the division always has to be provided. even if the system in question doesn't have divisions, the bookstore_functions code creates a placeholder
 
-require('../includes/autoloads.php');
+require('includes/autoloads.php');
 
 date_default_timezone_set('GMT');
 
@@ -135,7 +135,6 @@ if (!$conn = connect()) {
         $Books = array();
 
         $query = class_items_query(array($section_id), $campus_id);
-
         if (!$result = mysql_query($query)) {
             $json['status'] = 'Error: Class-Items SQL query failed with ' . mysql_error();
         } else if (mysql_num_rows($result) == 0) {
@@ -195,4 +194,5 @@ if (!$conn = connect()) {
 
 $json['total_time'] = round(microtime(true) - $first_start, 3) * 1000;
 
+header('Content-Type: application/json');
 echo json_encode($json);

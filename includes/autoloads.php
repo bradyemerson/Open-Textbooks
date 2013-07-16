@@ -16,6 +16,7 @@ require($root . '/math_functions.php');
 require($root . '/parsing_functions.php');
 require($root . '/url_functions.php');
 require($root . '/validation_functions.php');
+require($root . '/simple_html_dom.php');
 
 require($root . '/error_handler.php');
 $errorHandler = new ErrorHandle();
