@@ -1288,7 +1288,7 @@ function get_classes_and_items_from_campushub($valuesArr) {
     return $returnArray;
 }
 
-function get_classes_and_items_from_bn($valuesArr) {
+function get_classes_and_items_from_bn(array $valuesArr) {
     if (isset($valuesArr['Term_ID']) && !isset($valuesArr['Division_ID'])) {
         return array(); //because BN doesn't have Division values.
     }
@@ -1299,19 +1299,10 @@ function get_classes_and_items_from_bn($valuesArr) {
 
     if (!isset($valuesArr['Class_ID'])) {
         //make initialization request if they don't have a session yet...
-        curl_request(array(CURLOPT_URL => $valuesArr['Storefront_URL'],
+        $response = curl_request(array(
+            CURLOPT_URL => $valuesArr['Storefront_URL'],
             CURLOPT_COOKIESESSION => true,
-                /* CURLOPT_PROXY => PROXY_2,
-                  CURLOPT_PROXYUSERPWD => PROXY_2_AUTH */
         ));
-
-        //pt 2 of initialization is requesting the textbook lookup page
-        $options = array(CURLOPT_URL => $referer,
-                /* CURLOPT_PROXY => PROXY_2,
-                  CURLOPT_PROXYUSERPWD => PROXY_2_AUTH */
-        );
-
-        $response = curl_request($options);
 
         if (!$response) {
             throw new Exception('Failed to initialize the BN session with values ' . print_r($valuesArr, true));
@@ -1321,172 +1312,164 @@ function get_classes_and_items_from_bn($valuesArr) {
         if (!isset($valuesArr['Term_ID'])) {
             //We're doing this Multiple_Campuses thing for now, until we improve the system..
             if ($valuesArr['Multiple_Campuses'] == 'Y') { //they have a campus dropdown.
-                $url .= 'TextBookProcessDropdownsCmd?campusId=' . $valuesArr['Campus_Value'] . '&termId=&deptId=&courseId=&sectionId=&storeId=' . $valuesArr['Store_Value'] . '&catalogId=10001&langId=-1&dojo.transport=xmlhttp&dojo.preventCache=' . time();
+                $url .= 'TextBookProcessDropdownsCmd?campusId=' . $valuesArr['Campus_Value'] . '&termId=&deptId=&courseId=&sectionId=&storeId=' . $valuesArr['Store_Value'] . '&catalogId=10001&langId=-1dropdown=campus';
             } else {
                 $url = $referer;
             }
         } else if (!isset($valuesArr['Department_ID'])) {
-            $url .= 'TextBookProcessDropdownsCmd?campusId=' . $valuesArr['Campus_Value'] . '&termId=' . $valuesArr['Term_Value'] . '&deptId=&courseId=&sectionId=&storeId=' . $valuesArr['Store_Value'] . '&catalogId=10001&langId=-1&dojo.transport=xmlhttp&dojo.preventCache=' . time();
+            $url .= 'TextBookProcessDropdownsCmd?campusId=' . $valuesArr['Campus_Value'] . '&termId=' . $valuesArr['Term_Value'] . '&deptId=&courseId=&sectionId=&storeId=' . $valuesArr['Store_Value'] . '&catalogId=10001&langId=-1&dropdown=term';
+            $response_value = 'Department_Value';
+            $response_name = 'Department_Code';
         } else if (!isset($valuesArr['Course_ID'])) {
-            $url .= 'TextBookProcessDropdownsCmd?campusId=' . $valuesArr['Campus_Value'] . '&termId=' . $valuesArr['Term_Value'] . '&deptId=' . $valuesArr['Department_Value'] . '&courseId=&sectionId=&storeId=' . $valuesArr['Store_Value'] . '&catalogId=10001&langId=-1&dojo.transport=xmlhttp&dojo.preventCache=' . time();
+            $url .= 'TextBookProcessDropdownsCmd?campusId=' . $valuesArr['Campus_Value'] . '&termId=' . $valuesArr['Term_Value'] . '&deptId=' . $valuesArr['Department_Value'] . '&courseId=&sectionId=&storeId=' . $valuesArr['Store_Value'] . '&catalogId=10001&langId=-1&dropdown=dept';
+            $response_value = 'Course_Value';
+            $response_name = 'Course_Code';
         } else if (!isset($valuesArr['Class_ID'])) {
-            $url .= 'TextBookProcessDropdownsCmd?campusId=' . $valuesArr['Campus_Value'] . '&termId=' . $valuesArr['Term_Value'] . '&deptId=' . $valuesArr['Department_Value'] . '&courseId=' . $valuesArr['Course_Value'] . '&sectionId=&storeId=' . $valuesArr['Store_Value'] . '&catalogId=10001&langId=-1&dojo.transport=xmlhttp&dojo.preventCache=' . time();
+            $url .= 'TextBookProcessDropdownsCmd?campusId=' . $valuesArr['Campus_Value'] . '&termId=' . $valuesArr['Term_Value'] . '&deptId=' . $valuesArr['Department_Value'] . '&courseId=' . $valuesArr['Course_Value'] . '&sectionId=&storeId=' . $valuesArr['Store_Value'] . '&catalogId=10001&langId=-1&dropdown=course';
+            $response_value = 'Class_Value';
+            $response_name = 'Class_Code';
         }
 
-        $options = array(CURLOPT_URL => $url,
+        $options = array(
+            CURLOPT_URL => $url,
             CURLOPT_REFERER => $referer,
-                /* CURLOPT_PROXY => PROXY_2,
-                  CURLOPT_PROXYUSERPWD => PROXY_2_AUTH */
         );
     } else { //prepare the class-items query
-        //x and y values indicate to the script which pixels you clicked for their analytics purposes.  we play it safe by randomizing them within the possible range.
-        $x = rand(0, 115);
-        $y = rand(0, 20);
-
-        $postdata = 'storeId=' . $valuesArr['Store_Value'] . '&langId=-1&catalogId=10001&savedListAdded=true&clearAll=&viewName=TBWizardView&removeSectionId=&mcEnabled=N&section_1=' . $valuesArr['Class_Value'] . '&numberOfCourseAlready=0&viewTextbooks.x=' . $x . '&viewTextbooks.y=' . $y . '&sectionList=newSectionNumber'; //get the class-book data.
-        //$options = array(CURLOPT_URL => $url .'TBListView', CURLOPT_REFERER => $referer, CURLOPT_POST => true, CURLOPT_POSTFIELDS => $postdata);
-        $options = array(CURLOPT_URL => $url . 'TBListView',
+        $options = array(
+            CURLOPT_URL => $url . 'TBListView',
             CURLOPT_REFERER => $referer,
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $postdata,
-                /* CURLOPT_PROXY => PROXY_2,
-                  CURLOPT_PROXYUSERPWD => PROXY_2_AUTH */
+            CURLOPT_POSTFIELDS => array(
+                'campus1' => $valuesArr['Campus_Value'],
+                'catalogId' => '10001',
+                'clearAll' => '',
+                'firstTermId_' . $valuesArr['Campus_Value'] => $valuesArr['Term_Value'],
+                'firstTermName_' . $valuesArr['Campus_Value'] => $valuesArr['Term_Name'],
+                'langId' => '-1',
+                'mcEnabled' => 'N',
+                'numberOfCourseAlready' => '0',
+                'removeSectionId' => '',
+                'section_1' => $valuesArr['Class_Value'],
+                'selectCourse' => 'Select Course',
+                'selectDepartment' => 'Select Department',
+                'selectSection' => 'Select Section',
+                'selectTerm' => 'Select Term',
+                'showCampus' => $valuesArr['Multiple_Campuses'] == 'Y' ? 'true' : 'false',
+                'storeId' => $valuesArr['Store_Value'],
+                'viewName' => 'TBWizardView'
+            ),
         );
     }
 
     $response = curl_request($options);
 
-
     if (!$response) {
         throw new Exception('Failed to get a response with values ' . print_r($valuesArr, true));
     } else {
         $returnArray = array();
-        //continue here with finder stuff for term...
-        $doc = new DOMDocument();
-
-        @$doc->loadHTML($response); //supress the error cus HTML is imperfect
-
-        $finder = new DomXPath($doc);
 
         //time to process the response...
         if (!isset($valuesArr['Term_Value'])) {
-            $select_tags = $doc->getElementsByTagName('select');
-
-            $term_options = $finder->query('//select[@name="s2"]/option');
-
-            if ($term_options->length == 0) {
-                throw new Exception('Failed to get term select with values ' . print_r($valuesArr, true));
+            if ($valuesArr['Multiple_Campuses'] == 'Y') {
+                $terms = json_decode($response);
+                if (!$terms) {
+                    throw new Exception('Failed to get term select with values ' . print_r($valuesArr, true));
+                }
+                foreach ($terms as $term) {
+                    $returnArray[] = array('Term_Value' => $term->categoryId, 'Term_Name' => $term->title);
+                }
             } else {
-                for ($j = 1; $j < $term_options->length; $j++) { //skip the first "select"
-                    $term_option = $term_options->item($j);
-                    $returnArray[] = array('Term_Value' => $term_option->getAttribute('value'), 'Term_Name' => $term_option->nodeValue);
+                $html = str_get_html($response);
+                $term_ul = $html->find('ul[class=termOptions]', 0);
+                if (!$term_ul) {
+                    throw new Exception('Failed to get term select with values ' . print_r($valuesArr, true));
                 }
-            }
-        } else if (!isset($valuesArr['Department_Value'])) {
-            $option_tags = $doc->getElementsByTagName('option');
-            for ($i = 1; $i < $option_tags->length; $i++) { //skip the first "select"
-                $option_tag = $option_tags->item($i);
-                $returnArray[] = array('Department_Value' => $option_tag->getAttribute('value'), 'Department_Code' => $option_tag->nodeValue);
-            }
-        } else if (!isset($valuesArr['Course_Value'])) {
-            $option_tags = $doc->getElementsByTagName('option');
-
-            for ($i = 1; $i < $option_tags->length; $i++) { //skip the first "select"
-                $option_tag = $option_tags->item($i);
-                $returnArray[] = array('Course_Value' => $option_tag->getAttribute('value'), 'Course_Code' => $option_tag->nodeValue);
-            }
-        } else if (!isset($valuesArr['Class_Value'])) {
-            $option_tags = $doc->getElementsByTagName('option');
-
-            for ($i = 1; $i < $option_tags->length; $i++) {
-                $option_tag = $option_tags->item($i);
-                if (substr($option_tag->getAttribute('value'), -2) == "N_") {
-                    $value = substr($option_tag->getAttribute('value'), 0, -2); //clear up the N_ shit.
-                } else {
-                    $value = $option_tag->getAttribute('value');
+                foreach ($term_ul->find('li') as $li) {
+                    $returnArray[] = array('Term_Value' => $li->getAttribute('data-optionvalue'), 'Term_Name' => $li->plaintext);
                 }
-
-                $returnArray[] = array('Class_Value' => $value, 'Class_Code' => $option_tag->nodeValue);
+                $html->clear();
+                unset($html);
             }
-        }
-        //continue with other dropdown responses..
-        else {
-            $cb_divs = $finder->query('//div[@class="tbListHolding"]');
+        } else if (!isset($valuesArr['Department_Value']) || !isset($valuesArr['Course_Value']) || !isset($valuesArr['Class_Value'])) {
+            $json = json_decode($response);
+            if (!$json) {
+                throw new Exception('Failed to get dropdown json with values ' . print_r($valuesArr, true));
+            }
+            foreach ($json as $item) {
+                $returnArray[] = array($response_value => $item->categoryId, $response_name => $item->title);
+            }
 
+            /* In the class response there is an extra field that says if the course has books or not, would be cool to save that
+              if (!isset($valuesArr['Class_Value'])) {
+              foreach ($json as $item) {
+              $item->field1 == 'Y' // there are no books for this class
+              }
+              }
+             */
+        } else { //continue with class items search
             $items = array();
+            $html = str_get_html($response);
 
-            foreach ($cb_divs as $i => $cb_div) {
-                //Begin by getting Title and Necessity..
-                $title_search = $finder->query('.//div[@class="sectionProHeading"]//li/a', $cb_div);
+            $books = $html->find('.book_details');
+            foreach ($books as $book) {
+                $item = array();
 
-                if ($title_search->length != 0) {
-                    $items[$i]['Title'] = $title_search->item(0)->nodeValue;
-                    $items[$i]['Necessity'] = $finder->query('.//div[@class="sectionProHeading"]//li[@class="required"]', $cb_div)->item(0)->nodeValue;
+                // first get the description info
+                $description_em = $book->find('.book_desc1', 0);
+                $item['Title'] = html_entity_decode($description_em->find('h1 a', 0)->title);
 
-                    //Next get more Items data..
-                    $item_lis = $finder->query('.//ul[@class="TBinfo"]/li', $cb_div); //these lis have the item data..
+                $required_em = $description_em->find('span[class=recommendBookType]', 0);
+                $item['Necessity'] = substr($required_em->innertext, 0, strpos($required_em->innertext, '<input'));
 
-                    foreach ($item_lis as $li) {
-                        $span = $li->getElementsByTagName('span');
-                        if ($span->length) {
-                            $span = $span->item(0);
-                            $span_val = trim($span->nodeValue);
-                            $li->removeChild($span); //so its not included in nodeValue
-                            switch ($span_val) {
-                                case 'Author:':
-                                    $items[$i]['Authors'] = $li->nodeValue;
-                                    break;
-                                case 'Edition:':
-                                    $items[$i]['Edition'] = $li->nodeValue;
-                                    break;
-                                case 'Publisher:':
-                                    $items[$i]['Publisher'] = $li->nodeValue;
-                                    break;
-                                case 'ISBN:':
-                                    $items[$i]['ISBN'] = $li->nodeValue;
-                                    break;
-                            }
-                        }
-                    }
+                $author_em = $description_em->find('span[!class]', 0)->find('i', 0);
+                $item['Authors'] = html_entity_decode(substr($author_em->innertext, stripos($author_em->innertext, 'By ') + 3));
 
-                    //Next we get the Bookstore Price...
-                    $pricing_labels = $finder->query('.//td[@class="sectionSelect"]/ul/li/label', $cb_div);
+                $ul = $description_em->find('ul[!class]', 0);
+                foreach ($ul->find('li') as $li) {
+                    $li_text = str_replace('<br />', '', str_replace('&nbsp;', '', $li->innertext));
+                    $value = substr($li_text, strpos($li_text, '</strong>') + 9);
 
-                    $pricingList = array();
-
-                    //need to fix this up to extract only the price..
-                    foreach ($pricing_labels as $label) {
-                        $span = $label->getElementsByTagName('span');
-                        if ($span->length) {
-                            $span = $span->item(0);
-                            $name = trim($span->nodeValue);
-                            if (strpos($name, 'Used') !== false) {
-                                $name = 'Used';
-                            }
-
-                            $label->removeChild($span); //so its not included in nodeValue
-                            $price = priceFormat($label->nodeValue); //format so we can compare
-                            $pricingList[] = $price;
-
-                            switch ($name) {
-                                case 'Rental':
-                                    $items[$i]['Used_Rental_Price'] = $price;
-                                    break;
-                                case 'New':
-                                    $items[$i]['New_Price'] = $price;
-                                    break;
-                                case 'Used':
-                                    $items[$i]['Used_Price'] = $price;
-                                    break;
-                            }
-                        }
-                    }
-
-                    if ($pricingList) {
-                        $items[$i]['Bookstore_Price'] = max($pricingList);
+                    switch (trim($li->find('strong', 0)->innertext)) {
+                        case 'EDITION:':
+                            $item['Edition'] = $value;
+                            break;
+                        case 'PUBLISHER:':
+                            $item['Publisher'] = $value;
+                            break;
+                        case 'ISBN:':
+                            $item['ISBN'] = $value;
+                            break;
                     }
                 }
+
+                // now pricing
+                foreach ($book->find('ul[class=cm_tb_bookList] li') as $li) {
+                    $price = $li->find('span[class=bookPrice]', 0)->title;
+                    switch ($li->title) {
+                        case 'RENT USED':
+                            $item['New_Rental_Price'] = $price;
+                            break;
+                        case 'RENT NEW':
+                            $item['Used_Rental_Price'] = $price;
+                            break;
+                        case 'BUY USED ':
+                            $item['Used_Price'] = $price;
+                            if (!isset($item['Bookstore_Price'])) {
+                                $item['Bookstore_Price'] = $price;
+                            }
+                            break;
+                        case 'BUY NEW ':
+                            $item['New_Price'] = $price;
+                            $item['Bookstore_Price'] = $price;
+                            break;
+                    }
+                }
+
+                $items[] = $item;
             }
+
+            $html->clear();
+            unset($html);
 
             $returnArray['Class_ID'] = $valuesArr['Class_ID'];
             $returnArray['items'] = $items; //trim them all
