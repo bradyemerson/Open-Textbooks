@@ -96,7 +96,7 @@ function load_books_from_row($Books, $row) { //Updates Books with a row from the
 }
 
 function load_items_from_array($arr) {
-    $items_arr = array();
+    $items_array = array();
 
     $fields_arr = array('Title', 'Item_ID', 'ISBN', 'Authors', 'Edition', 'Year', 'Publisher', 'Necessity', 'Comments', 'Bookstore_Price', 'New_Price', 'Used_Price', 'New_Rental_Price', 'Used_Rental_Price');
 

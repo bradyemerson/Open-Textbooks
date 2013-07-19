@@ -234,6 +234,176 @@ function get_classes_and_items_from_neebo($valuesArr) {
     return $returnArray;
 }
 
+function get_classes_and_items_from_textbooktech(array $valuesArr) {
+    if (isset($valuesArr['Term_ID']) && !isset($valuesArr['Division_ID'])) {
+        return array(); //because Textbook Tech doesn't have Division values.
+    }
+
+    $url = $valuesArr['Fetch_URL'] . 'checkout/onepage/';
+
+    $referer = $valuesArr['Storefront_URL'] . 'textbook/';
+
+    if (!isset($valuesArr['Class_ID'])) {
+        $post = array();
+        //prepare appropriate dropdown query depending on what they're trying to get...
+        if (!isset($valuesArr['Term_ID'])) {
+            $url .= 'availableTerms/';
+            $post = array(
+                'schoolId' => $valuesArr['Campus_Value']
+            );
+        } else if (!isset($valuesArr['Department_ID'])) {
+            $url .= 'availableDepartments/';
+            $post = array(
+                'schoolId' => $valuesArr['Campus_Value'],
+                'termNameId' => $valuesArr['Term_Value']
+            );
+        } else if (!isset($valuesArr['Course_ID'])) {
+            $url .= 'availableCourses/';
+            $post = array(
+                'departmentId' => $valuesArr['Department_Value'],
+                'termNameId' => $valuesArr['Term_Value']
+            );
+        } else if (!isset($valuesArr['Class_ID'])) {
+            $url .= 'availableSections/';
+            $post = array(
+                'courseCode' => $valuesArr['Course_Value'],
+                'departmentId' => $valuesArr['Department_Value'],
+                'termNameId' => $valuesArr['Term_Value']
+            );
+        }
+
+        $options = array(
+            CURLOPT_URL => $url,
+            CURLOPT_REFERER => $referer,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $post
+        );
+    } else { //prepare the class-items query
+        $options = array(
+            CURLOPT_URL => $valuesArr['Fetch_URL'] . 'catalog/product/view/id/' . $valuesArr['Class_Value'],
+            CURLOPT_REFERER => $referer,
+            CURLOPT_POST => true
+        );
+    }
+
+    $response = curl_request($options);
+
+    if (!$response) {
+        throw new Exception('Failed to get a response with values ' . print_r($valuesArr, true));
+    } else {
+        $returnArray = array();
+
+        if (!isset($valuesArr['Term_ID'])) {
+            $json = json_decode($response);
+            if (!$json) {
+                throw new Exception('Failed to get term dropdown with values ' . print_r($valuesArr, true));
+            }
+            foreach ($json as $item) {
+                if ($item->active == '1') {
+                    $returnArray[] = array('Term_Value' => $item->id, 'Term_Name' => $item->term_name);
+                }
+            }
+        } else if (!isset($valuesArr['Department_ID'])) {
+            $json = json_decode($response);
+            if (!$json) {
+                throw new Exception('Failed to get department dropdown with values ' . print_r($valuesArr, true));
+            }
+            foreach ($json as $item) {
+                $returnArray[] = array('Department_Value' => $item->id, 'Department_Code' => $item->department_code);
+            }
+        } else if (!isset($valuesArr['Course_ID'])) {
+            $json = json_decode($response);
+            if (!$json) {
+                throw new Exception('Failed to get course dropdown with values ' . print_r($valuesArr, true));
+            }
+            foreach ($json as $item) {
+                $returnArray[] = array('Course_Value' => $item->course_code, 'Course_Code' => $item->course_code);
+            }
+        } else if (!isset($valuesArr['Class_ID'])) {
+            $json = json_decode($response);
+            if (!$json) {
+                throw new Exception('Failed to get class dropdown with values ' . print_r($valuesArr, true));
+            }
+            foreach ($json as $item) {
+                $returnArray[] = array('Class_Value' => $item->magento_course_id, 'Class_Code' => $item->section_code);
+            }
+        } else { //continue with class items search
+            $items = array();
+            $html = str_get_html($response);
+
+            $books = $html->find('.book-info');
+            foreach ($books as $book) {
+                $item = array();
+
+                // first get the description info
+                $name_em = $book->find('.book-name', 0);
+                $span_pos = strpos($name_em->innertext, '(<span');
+                $item['Title'] = html_entity_decode(substr($name_em->innertext, 0, $span_pos === false ? strlen($name_em->innertext) : $span_pos));
+                if (stripos($name_em->innertext, 'REQUIRED') !== false) {
+                    $item['Necessity'] = 'REQUIRED';
+                } else {
+                    $item['Necessity'] = 'OPTIONAL';
+                }
+
+                foreach ($book->find('.book-attr ul li') as $li) {
+                    $value = trim(substr($li->innertext, strpos($li->innertext, '</b>') + 4));
+                    if (!$value) {
+                        continue;
+                    }
+                    switch (trim($li->find('b', 0)->innertext)) {
+                        case 'Author:':
+                            $item['Authors'] = $value;
+                            break;
+                        case 'Edition:':
+                            $item['Edition'] = $value;
+                            break;
+                        case 'Publisher:':
+                            $item['Publisher'] = $value;
+                            break;
+                        case 'ISBN:':
+                            $item['ISBN'] = $value;
+                            break;
+                    }
+                }
+
+                // now pricing
+                foreach ($book->find('.book-price') as $book_price) {
+                    if (!trim($book_price->innertext)) {
+                        continue;
+                    }
+                    $new_used = $book_price->find('input[type=radio]', 0)->getAttribute('class');
+                    $price = $book_price->find('.price', 0)->plaintext;
+                    switch ($new_used) {
+                        case 'Rental':
+                            $item['Used_Rental_Price'] = $price;
+                            break;
+                        case 'Used':
+                            $item['Used_Price'] = $price;
+                            if (!isset($item['Bookstore_Price'])) {
+                                $item['Bookstore_Price'] = $price;
+                            }
+                            break;
+                        case 'New':
+                            $item['New_Price'] = $price;
+                            $item['Bookstore_Price'] = $price;
+                            break;
+                    }
+                }
+
+                $items[] = $item;
+            }
+
+            $html->clear();
+            unset($html);
+
+            $returnArray['Class_ID'] = $valuesArr['Class_ID'];
+            $returnArray['items'] = $items; //trim them all
+        }
+
+        return $returnArray;
+    }
+}
+
 function get_classes_and_items_from_follett(array $valuesArr) {
     //We hardcode Program_Value and Campus_Value in the Campuses table because they are campus-specific and pretty much static.  Division_Value varies and is sometimes like a higher level department, so we give it it's own table..
 
@@ -1110,6 +1280,19 @@ function get_classes_and_items_from_mbs($valuesArr) {
     return $returnArray;
 }
 
+// This is the php version and sites normally have mbsdirect.net in their domain
+// The other MBS is MBS Textbook Exchange, Inc. Probably not the same company?
+function get_classes_and_items_from_mbsdirect(array $valuesArr) {
+    // TODO implement when there is demand?
+    /*
+     * Somet notes:
+     * http://bookstore.mbsdirect.net/collegeofidaho.htm
+     * Textbook buying entrance page: http://bookstore.mbsdirect.net/vb_buy.php?ACTION=top&FVCUSNO=37411&VCHI=1
+     * store id: 37411
+     * Example with campuses: http://bookstore.mbsdirect.net/vb_buy.php?ACTION=top&FVCUSNO=5320&VCHI=1
+     */
+}
+
 function get_classes_and_items_from_campushub($valuesArr) {
     if (isset($valuesArr['Term_ID']) && !isset($valuesArr['Division_ID'])) {
         //No such thing as Divisions on CampusHub
@@ -1385,7 +1568,7 @@ function get_classes_and_items_from_bn(array $valuesArr) {
                     throw new Exception('Failed to get term select with values ' . print_r($valuesArr, true));
                 }
                 foreach ($term_ul->find('li') as $li) {
-                    $returnArray[] = array('Term_Value' => $li->getAttribute('data-optionvalue'), 'Term_Name' => $li->plaintext);
+                    $returnArray[] = array('Term_Value' => $li->getAttribute('data-optionvalue'), 'Term_Name' => html_entity_decode($li->plaintext));
                 }
                 $html->clear();
                 unset($html);
@@ -1410,8 +1593,7 @@ function get_classes_and_items_from_bn(array $valuesArr) {
             $items = array();
             $html = str_get_html($response);
 
-            $books = $html->find('.book_details');
-            foreach ($books as $book) {
+            foreach ($html->find('.book_details') as $book) {
                 $item = array();
 
                 // first get the description info
@@ -1424,8 +1606,7 @@ function get_classes_and_items_from_bn(array $valuesArr) {
                 $author_em = $description_em->find('span[!class]', 0)->find('i', 0);
                 $item['Authors'] = html_entity_decode(substr($author_em->innertext, stripos($author_em->innertext, 'By ') + 3));
 
-                $ul = $description_em->find('ul[!class]', 0);
-                foreach ($ul->find('li') as $li) {
+                foreach ($description_em->find('ul[!class]', 0)->find('li') as $li) {
                     $li_text = str_replace('<br />', '', str_replace('&nbsp;', '', $li->innertext));
                     $value = substr($li_text, strpos($li_text, '</strong>') + 9);
 
@@ -1509,6 +1690,12 @@ function update_classes_from_bookstore($valuesArr) { //$valuesArr is an array of
                     break;
                 case 'eRATEX':
                     $results = get_classes_and_items_from_eratex($valuesArr);
+                    break;
+                case 'Textbook Tech':
+                    $results = get_classes_and_items_from_textbooktech($valuesArr);
+                    break;
+                default:
+                    throw new Exception("Unrecognized bookstore type for classes: {$valuesArr['Bookstore_Type_Name']}");
                     break;
                 //These functions will return false or empty array on error or 0 $results...
             }
@@ -1669,6 +1856,12 @@ function update_class_items_from_bookstore($classValuesArr) { //$classValuesArr 
                         break;
                     case 'eRATEX':
                         $results = get_classes_and_items_from_eratex($valuesArr);
+                        break;
+                    case 'Textbook Tech':
+                        $results = get_classes_and_items_from_textbooktech($valuesArr);
+                        break;
+                    default:
+                        throw new Exception("Unrecognized bookstore type for dropdowns: {$valuesArr['Bookstore_Type_Name']}");
                         break;
                     //These functions will return false or empty array on error or 0 $results...
                 }
@@ -2070,7 +2263,7 @@ function get_buybacks_from_mbs(array $valuesArr) {
 
     do {
         if (!isset($sessionStarted) || !$sessionStarted) {
-//initial terms request to establish a session
+            //initial terms request to establish a session
             $options = array(CURLOPT_URL => $mbs_url,
                 CURLOPT_USERAGENT => $useragent,
                 CURLOPT_COOKIESESSION => true);
@@ -2080,7 +2273,7 @@ function get_buybacks_from_mbs(array $valuesArr) {
                 CURLOPT_POSTFIELDS => '__VIEWSTATE=' . urlencode($mbs_viewstate) . '&__EVENTTARGET=&__EVENTARGUMENT=&' . $mbs_isbn_name . '=' . $valuesArr['isbn'] . '&cmdSearch=Search',
                 CURLOPT_USERAGENT => $useragent);
         }
-//time to make the response
+        //time to make the response
         $response = curl_request($options);
 
         if (!$response) {
@@ -2099,7 +2292,7 @@ function get_buybacks_from_mbs(array $valuesArr) {
                         throw new Exception('No input in response with values ' . print_r($valuesArr, true));
                     } else { //form and input tags are there as they're supposed to be
                         $input = $input_tags->item(0);
-//update the state session stuff..
+                        //update the state session stuff..
                         $mbs_url = $valuesArr['Fetch_URL'] . $form->getAttribute('action');
                         $mbs_viewstate = $input->getAttribute('value');
 
@@ -2117,7 +2310,7 @@ function get_buybacks_from_mbs(array $valuesArr) {
                 $table_tags = $doc->getElementsByTagName('table');
 
                 if ($table_tags->length == 1) { // table means they are buying, no table means they are not
-// first row, second column
+                    // first row, second column
                     $td_tag = $table_tags->item(0)
                                     ->getElementsByTagName('tr')->item(0)
                                     ->getElementsByTagName('td')->item(1);
@@ -2242,7 +2435,8 @@ function update_buyback_items_from_bookstore(array $valuesArr) {
 
         switch ($valuesArr['Bookstore_Type_Name']) {
             case 'Barnes and Nobles':
-//$results = get_buybacks_from_bn($valuesArr);
+                //$results = get_buybacks_from_bn($valuesArr);
+                $results = array();
                 break;
             case 'CampusHub':
                 $results = get_buybacks_from_campushub($valuesArr);
@@ -2254,12 +2448,16 @@ function update_buyback_items_from_bookstore(array $valuesArr) {
                 $results = get_buybacks_from_follett($valuesArr);
                 break;
             case 'ePOS':
-//$results = get_buybacks_from_epos($valuesArr);
+                //$results = get_buybacks_from_epos($valuesArr);
+                $results = array();
                 break;
             case 'Neebo':
                 $results = get_buybacks_from_neebo($valuesArr);
                 break;
-//These functions will return false or empty array on error or 0 $results...
+            default:
+                throw new Exception("Unrecognized bookstore type for buyback: {$valuesArr['Bookstore_Type_Name']}");
+                break;
+            //These functions will return false or empty array on error or 0 $results...
         }
 
 // insert into cache

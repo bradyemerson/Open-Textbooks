@@ -1,5 +1,7 @@
 <?php
 
+ini_set('memory_limit', '-1');
+
 //An API for the course-book data.  Give it sequential urls, like this:
 // api.php?campus=N
 // api.php?campus=N&term=N
@@ -16,7 +18,7 @@ date_default_timezone_set('GMT');
 
 $first_start = microtime(true);
 
-$user_token = time() . rand(); //globalled in url_functions
+$user_token = $_SERVER['REMOTE_ADDR']; //globalled in url_functions
 
 $json = array();
 $json['data'] = array();
