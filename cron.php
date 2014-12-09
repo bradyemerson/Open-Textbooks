@@ -28,6 +28,9 @@ if (!$conn = connect()) {
     die('Problem with DB connect');
 }
 
+
+echo 'Starting checks: ';
+echo_memory_usage();
 // Loop through a portion of the bookstores and check for redirects
 $start_time = microtime(true);
 
@@ -48,6 +51,9 @@ mysql_free_result($result);
 // wait for all outstanding requests to finish
 $parallelcurl->finishAllRequests();
 
+echo 'Done with checks: ';
+echo_memory_usage();
+
 $totalTime = microtime(true) - $start_time;
 $statistics['bookstore'] = array(
     'total_time' => round($totalTime, 2) . 'sec',
@@ -55,7 +61,6 @@ $statistics['bookstore'] = array(
     'total_checked' => $bookstores_todo,
     'query' => $query
 );
-
 
 
 // Loop through fullet campuses and update terms
@@ -89,11 +94,14 @@ $statistics['fullett'] = array(
 
 // Now that we have looped through a portion of fullett schools, check if any are missing HOEA term ids
 $query = <<<EOT
-SELECT `Term_ID`, `Term_Name`, Campuses.Campus_ID, Campus_Name, Bookstores.Follett_HEOA_Store_Value
+SELECT `Term_ID`, `Term_Name`, Campuses.Campus_ID, Campus_Name, Bookstores.Follett_HEOA_Store_Value, Bookstores.Bookstore_ID,
+    Follett_Terms_Pattern.Fall_Pattern, Follett_Terms_Pattern.Spring_Pattern, 
+    Follett_Terms_Pattern.Winter_Pattern, Follett_Terms_Pattern.Summer_Pattern
 FROM `Terms_Cache`
 INNER JOIN `Campuses` ON Campuses.Campus_ID = Terms_Cache.Campus_ID
 INNER JOIN Bookstores ON Campuses.Bookstore_ID = Bookstores.Bookstore_ID
 INNER JOIN Campus_Names ON Campuses.Campus_ID = Campus_Names.Campus_ID AND Is_Primary = 'Y'
+LEFT JOIN Follett_Terms_Pattern ON Follett_Terms_Pattern.Bookstore_ID = Bookstores.Bookstore_ID
 WHERE `Follett_HEOA_Term_Value` IS NULL AND Bookstore_Type_ID = 4
 EOT;
 $result = db_query($query);
@@ -101,6 +109,80 @@ $missingTerms = array();
 $missingTermIds = array();
 while ($row = mysql_fetch_assoc($result)) {
     $row['heoa_url'] = "http://www.bkstr.com/webapp/wcs/stores/servlet/booklookServlet?bookstore_id-1={$row['Follett_HEOA_Store_Value']}&term_id-1=###&crn-1=111";
+    
+    // Search for the year
+    if (preg_match('([\d]{2,4})', $row['Term_Name'], $preg_matches) === 1 && count($preg_matches) === 1) {
+        $term_year = $preg_matches[0];
+        if (strlen($term_year) === 2) {
+            $term_year = "20" . $term_year;
+        }
+        $school_year = $term_year;
+        
+        /*****
+         * S = School Year 4 - Add a year
+         * s = School Year 2 - Add a year
+         * T = School Year 4 - Subtract a year
+         * t = School Year 2 - Subtract a year
+         * Y = Year 4 - 2014
+         * y = Year 2 - 14
+         * U = urlencode - Fall+2014
+         */
+        
+        $pattern = null;
+        if (stripos($row['Term_Name'], 'Fall') !== false) {
+            if ($row['Fall_Pattern']) {
+                $pattern = $row['Fall_Pattern'];
+            }
+        } else if (stripos($row['Term_Name'], 'Spring') !== false) {
+            if ($row['Spring_Pattern']) {
+                $pattern = $row['Spring_Pattern'];
+            }
+        } else if (stripos($row['Term_Name'], 'Summer') !== false) {
+            if ($row['Summer_Pattern']) {
+                $pattern = $row['Summer_Pattern'];
+            }
+        } else if (stripos($row['Term_Name'], 'Winter') !== false) {
+            if ($row['Winter_Pattern']) {
+                $pattern = $row['Winter_Pattern'];
+            }
+        }
+        
+        if ($pattern) {
+            $term_year = intval($term_year);
+            $row['term_year'] = $term_year;
+            $pattern = str_replace('Y', $term_year, $pattern);
+            $pattern = str_replace('y', substr($term_year, 2), $pattern);
+            $pattern = str_replace('S', $term_year + 1, $pattern);
+            $pattern = str_replace('s', substr($term_year + 1, 2), $pattern);
+            $pattern = str_replace('T', $term_year - 1, $pattern);
+            $pattern = str_replace('t', substr($term_year - 1, 2), $pattern);
+            $pattern = str_replace('U', urlencode($row['Term_Name']), $pattern);
+            
+            $row['test_url'] = str_replace('###', $pattern, $row['heoa_url']);
+            
+            // test the url
+            $ch = curl_init();
+            curl_setopt_array($ch, array(
+                CURLOPT_URL => $row['test_url'],
+                CURLOPT_RETURNTRANSFER => 1,
+                CURLOPT_FOLLOWLOCATION => 1,
+                CURLOPT_USERAGENT => random_user_agent(),
+                CURLOPT_CONNECTTIMEOUT => 7,
+                CURLOPT_TIMEOUT => 15,
+            ));
+            
+            $test_response = curl_exec($ch);
+            if (!trim($test_response) || curl_error($ch)) {
+                $row['error'] = curl_error($ch);
+            } else if (strpos($test_response, 'We are unable to find the requested term') !== false) {
+                $row['error'] = 'Term not found';
+            } else if (stripos($test_response, $row['Term_Name']) !== false) {
+                db_query("UPDATE `Terms_Cache` SET `Follett_HEOA_Term_Value` = \"{$pattern}\" WHERE `Term_ID` = {$row['Term_ID']};");
+                continue;
+            }
+        }
+    }
+    
 
     $term_result = db_query("SELECT `Term_ID`, `Term_Name`, `Follett_HEOA_Term_Value` FROM Terms_Cache WHERE Campus_ID = {$row['Campus_ID']} AND Follett_HEOA_Term_Value IS NOT NULL;");
     if (mysql_num_rows($term_result) > 0) {
@@ -144,11 +226,11 @@ function handle_curl_response($content, $url, $ch, $report) {
     } else {
         $report['destination_url'] = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
 
-        $html = str_get_html($content);
+        $html = str_get_dom($content);
 
         if ($html) {
-            foreach ($html->find('meta') as $meta) {
-                if (strcasecmp($meta->getAttribute('http-equiv'), 'refresh') === 0) {
+            foreach ($html('meta') as $meta) {
+                if (strcasecmp($meta->{'http-equiv'}, 'refresh') === 0) {
                     $report['meta'] = $meta->content;
                     break;
                 }
@@ -180,4 +262,18 @@ function handle_curl_response($content, $url, $ch, $report) {
 function handle_fullett_response($content, $url, $ch, $report) {
     // Do I care about anything here?
     curl_close($ch);
+}
+
+function echo_memory_usage() {
+    $mem_usage = memory_get_usage(true);
+
+    if ($mem_usage < 1024) {
+        echo $mem_usage . " bytes";
+    } elseif ($mem_usage < 1048576) {
+        echo round($mem_usage / 1024, 2) . " kilobytes";
+    } else {
+        echo round($mem_usage / 1048576, 2) . " megabytes";
+    }
+
+    echo "\n";
 }

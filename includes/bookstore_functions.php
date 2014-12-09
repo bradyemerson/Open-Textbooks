@@ -329,28 +329,28 @@ function get_classes_and_items_from_textbooktech(array $valuesArr) {
             }
         } else { //continue with class items search
             $items = array();
-            $html = str_get_html($response);
+            $html = str_get_dom($response);
 
-            $books = $html->find('.book-info');
+            $books = $html('.book-info');
             foreach ($books as $book) {
                 $item = array();
 
                 // first get the description info
-                $name_em = $book->find('.book-name', 0);
-                $span_pos = strpos($name_em->innertext, '(<span');
-                $item['Title'] = html_entity_decode(substr($name_em->innertext, 0, $span_pos === false ? strlen($name_em->innertext) : $span_pos));
-                if (stripos($name_em->innertext, 'REQUIRED') !== false) {
+                $name_em = $book('.book-name', 0);
+                $span_pos = strpos($name_em->getInnerText(), '(<span');
+                $item['Title'] = html_entity_decode(substr($name_em->getInnerText(), 0, $span_pos === false ? strlen($name_em->getInnerText()) : $span_pos));
+                if (stripos($name_em->getInnerText(), 'REQUIRED') !== false) {
                     $item['Necessity'] = 'REQUIRED';
                 } else {
                     $item['Necessity'] = 'OPTIONAL';
                 }
 
-                foreach ($book->find('.book-attr ul li') as $li) {
-                    $value = trim(substr($li->innertext, strpos($li->innertext, '</b>') + 4));
+                foreach ($book('.book-attr ul li') as $li) {
+                    $value = trim(substr($li->getInnerText(), strpos($li->getInnerText(), '</b>') + 4));
                     if (!$value) {
                         continue;
                     }
-                    switch (trim($li->find('b', 0)->innertext)) {
+                    switch (trim($li('b', 0)->getInnerText())) {
                         case 'Author:':
                             $item['Authors'] = $value;
                             break;
@@ -367,12 +367,12 @@ function get_classes_and_items_from_textbooktech(array $valuesArr) {
                 }
 
                 // now pricing
-                foreach ($book->find('.book-price') as $book_price) {
-                    if (!trim($book_price->innertext)) {
+                foreach ($book('.book-price') as $book_price) {
+                    if (!trim($book_price->getInnerText())) {
                         continue;
                     }
-                    $new_used = $book_price->find('input[type=radio]', 0)->getAttribute('class');
-                    $price = $book_price->find('.price', 0)->plaintext;
+                    $new_used = $book_price('input[type=radio]', 0)->class;
+                    $price = $book_price('.price', 0)->getPlainText();
                     switch ($new_used) {
                         case 'Rental':
                             $item['Used_Rental_Price'] = $price;
@@ -392,7 +392,7 @@ function get_classes_and_items_from_textbooktech(array $valuesArr) {
 
                 $items[] = $item;
             }
-
+            
             $html->clear();
             unset($html);
 
@@ -562,16 +562,16 @@ function get_classes_and_items_from_follett(array $valuesArr) {
             //class-book response from Follett's booklook system
             $items = array();
 
-            $html = str_get_html($response);
+            $html = str_get_dom($response);
 
-            $course = $html->find('div[class=clsCourseSection]', 0);
+            $course = $html('div[class=clsCourseSection]', 0);
             if (!$course) {
                 throw new Exception('Error: HTML markup was unexpected, unable to parse.');
             }
 
-            $error = $course->find('.efCourseErrorSection', 0);
+            $error = $course('.efCourseErrorSection', 0);
             if ($error) {
-                $error_text = $error->plaintext;
+                $error_text = $error->getPlainText();
                 if (!stripos($error_text, 'to be determined') &&
                         !stripos($error_text, 'no course materials required') &&
                         !stripos($error_text, 'no information received')) { //these are the two exceptions where there genuinely are 0 results.
@@ -584,60 +584,64 @@ function get_classes_and_items_from_follett(array $valuesArr) {
                 }
             }
 
-            foreach ($course->find('div[class=efCourseBody] ul li[class=material-group]') as $li) {
+            foreach ($course('div[class=efCourseBody] ul li[class=material-group]') as $li) {
                 // Each li represents required/optional/other
 
-                $group_title = $li->find('h2[class=material-group-name]', 0);
-                $required = $group_title->plaintext;
+                $group_title = $li('h2[class=material-group-name]', 0);
+                $required = $group_title->getPlainText();
                 if (strpos($required, '(')) {
                     $required = substr($required, 0, strpos($required, '('));
                 }
 
-                foreach ($li->find('li') as $book) {
+                foreach ($li('li') as $book) {
                     $item = array(
                         'Necessity' => $required
                     );
 
-                    foreach ($book->find('div[class=material-group-cover] span[id^=material]') as $info) {
-                        switch ($info->getAttribute('id')) {
+                    foreach ($book('div[class=material-group-cover] span[id^=material]') as $info) {
+                        switch ($info->id) {
                             case 'materialTitleImage':
-                                $image = $info->find('img', 0);
+                                $image = $info('img', 0);
                                 $item['Title'] = $image->alt;
                                 break;
                             case 'materialAuthor':
-                                $item['Authors'] = trim(substr($info->plaintext, strpos($info->plaintext, ':') + 1));
+                                $item['Authors'] = trim(substr($info->getPlainText(), strpos($info->getPlainText(), ':') + 1));
                                 break;
                             case 'materialEdition':
-                                $item['Edition'] = trim(substr($info->plaintext, strpos($info->plaintext, ':') + 1));
+                                $item['Edition'] = trim(substr($info->getPlainText(), strpos($info->getPlainText(), ':') + 1));
                                 break;
                             case 'materialISBN':
-                                $item['ISBN'] = trim(substr($info->plaintext, strpos($info->plaintext, ':') + 1));
+                                $item['ISBN'] = trim(substr($info->getPlainText(), strpos($info->getPlainText(), ':') + 1));
                                 break;
                             case 'materialCopyrightYear':
-                                $item['Year'] = trim(substr($info->plaintext, strpos($info->plaintext, ':') + 1));
+                                $item['Year'] = trim(substr($info->getPlainText(), strpos($info->getPlainText(), ':') + 1));
                                 break;
                             case 'materialPublisher':
-                                $item['Publisher'] = trim(substr($info->plaintext, strpos($info->plaintext, ':') + 1));
+                                $item['Publisher'] = trim(substr($info->getPlainText(), strpos($info->getPlainText(), ':') + 1));
                                 break;
                         }
                     }
 
-                    foreach ($book->find('div[class=material-group-table] table tr[class=print_background]') as $tr) {
-                        $buy_rent = $tr->find('td', 1);
-                        $new_used = $tr->find('td', 2);
-                        $price = $tr->find('td', 7);
-                        if (strcmp($buy_rent->plaintext, 'BUY&nbsp;')) {
-                            if (strcmp($new_used->plaintext, 'NEW&nbsp;')) {
-                                $item['Bookstore_Price'] = $price->plaintext;
+                    foreach ($book('div[class=material-group-table] table tr[class=print_background]') as $tr) {
+                        $buy_rent = $tr('td', 2);
+                        $new_used = $tr('td', 3);
+                        $price = $tr('td', 7);
+                        if (stripos($buy_rent->getPlainText(), 'BUY') !== false) {
+                            if (stripos($new_used->getPlainText(), 'NEW') !== false) {
+                                $item['Bookstore_Price'] = $price->getPlainText();
                                 $item['New_Price'] = $item['Bookstore_Price'];
-                            } else if (strcmp($new_used->plaintext, 'USED&nbsp;')) {
-                                $item['Used_Price'] = $price->plaintext;
+                            } else if (stripos($new_used->getPlainText(), 'USED') !== false) {
+                                $item['Used_Price'] = $price->getPlainText();
                                 if (!isset($item['Bookstore_Price'])) {
                                     $item['Bookstore_Price'] = $item['Used_Price'];
                                 }
                             }
-                        } elseif (strcmp($buy_rent->plaintext, 'RENT&nbsp;')) {
-
+                        } elseif (stripos($buy_rent->getPlainText(), 'RENT') !== false) {
+                            if (stripos($new_used->getPlainText(), 'NEW') !== false) {
+                                $item['New_Rental_Price'] = $price->getPlainText();
+                            } else if (stripos($new_used->getPlainText(), 'USED') !== false) {
+                                $item['Used_Rental_Price'] = $price->getPlainText();
+                            }
                         }
                     }
 
@@ -1562,14 +1566,15 @@ function get_classes_and_items_from_bn(array $valuesArr) {
                     $returnArray[] = array('Term_Value' => $term->categoryId, 'Term_Name' => $term->title);
                 }
             } else {
-                $html = str_get_html($response);
-                $term_ul = $html->find('ul[class=termOptions]', 0);
+                $html = str_get_dom($response);
+                $term_ul = $html('ul[class=termOptions]', 0);
                 if (!$term_ul) {
                     throw new Exception('Failed to get term select with values ' . print_r($valuesArr, true));
                 }
-                foreach ($term_ul->find('li') as $li) {
-                    $returnArray[] = array('Term_Value' => $li->getAttribute('data-optionvalue'), 'Term_Name' => html_entity_decode($li->plaintext));
+                foreach ($term_ul('li') as $li) {
+                    $returnArray[] = array('Term_Value' => $li->{'data-optionvalue'}, 'Term_Name' => html_entity_decode($li->getPlainText()));
                 }
+                
                 $html->clear();
                 unset($html);
             }
@@ -1591,41 +1596,43 @@ function get_classes_and_items_from_bn(array $valuesArr) {
              */
         } else { //continue with class items search
             $items = array();
-            $html = str_get_html($response);
+            $html = str_get_dom($response);
 
-            foreach ($html->find('.book_details') as $book) {
+            foreach ($html('.book_details') as $book) {
                 $item = array();
 
                 // first get the description info
-                $description_em = $book->find('.book_desc1', 0);
-                $item['Title'] = html_entity_decode($description_em->find('h1 a', 0)->title);
+                $description_em = $book('.book_desc1', 0);
+                $item['Title'] = html_entity_decode($description_em('h1 a', 0)->title);
 
-                $required_em = $description_em->find('span[class=recommendBookType]', 0);
-                $item['Necessity'] = substr($required_em->innertext, 0, strpos($required_em->innertext, '<input'));
+                $required_em = $description_em('span[class=recommendBookType]', 0);
+                $item['Necessity'] = trim(substr($required_em->getInnerText(), 0, strpos($required_em->getInnerText(), '<input')));
 
-                $author_em = $description_em->find('span[!class]', 0)->find('i', 0);
-                $item['Authors'] = html_entity_decode(substr($author_em->innertext, stripos($author_em->innertext, 'By ') + 3));
+                $author_em = $description_em('span[! class] i', 0);
+                $item['Authors'] = html_entity_decode(substr($author_em->getInnerText(), stripos($author_em->getInnerText(), 'By ') + 3));
 
-                foreach ($description_em->find('ul[!class]', 0)->find('li') as $li) {
-                    $li_text = str_replace('<br />', '', str_replace('&nbsp;', '', $li->innertext));
+                foreach ($description_em('ul[! class] li') as $li) {
+                    $li_text = str_replace('<br />', '', str_replace('&nbsp;', '', $li->getInnerText()));
                     $value = substr($li_text, strpos($li_text, '</strong>') + 9);
+                    $value = utf8_decode($value);
 
-                    switch (trim($li->find('strong', 0)->innertext)) {
+                    switch (trim($li('strong', 0)->getInnerText())) {
                         case 'EDITION:':
-                            $item['Edition'] = $value;
+                            $item['Edition'] = trim(preg_replace('/\s/', ' ', $value));
                             break;
                         case 'PUBLISHER:':
-                            $item['Publisher'] = $value;
+                            $item['Publisher'] = trim(preg_replace('/\s/', ' ', $value));
                             break;
                         case 'ISBN:':
-                            $item['ISBN'] = $value;
+                            preg_match('(\d{13})', $value, $isbn);
+                            $item['ISBN'] = $isbn[0];
                             break;
                     }
                 }
 
                 // now pricing
-                foreach ($book->find('ul[class=cm_tb_bookList] li') as $li) {
-                    $price = $li->find('span[class=bookPrice]', 0)->title;
+                foreach ($book('ul[class=cm_tb_bookList] li') as $li) {
+                    $price = $li('span[class=bookPrice]', 0)->title;
                     switch ($li->title) {
                         case 'RENT USED':
                             $item['New_Rental_Price'] = $price;
@@ -1648,7 +1655,7 @@ function get_classes_and_items_from_bn(array $valuesArr) {
 
                 $items[] = $item;
             }
-
+            
             $html->clear();
             unset($html);
 
